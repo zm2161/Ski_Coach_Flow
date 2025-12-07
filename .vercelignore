@@ -1,0 +1,15 @@
+node_modules
+build
+dist
+.git
+.trae
+.log
+.figma
+requirements.txt
+*.py
+example.MOV
+freeze_scene_*.jpg
+scene*.aiff
+scene*.m4a
+shotstack_*.json
+storyboard*.json

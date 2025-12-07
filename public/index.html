@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flo - 上传视频</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container landing-page">
+        <div class="landing-content">
+            <h1>欢迎使用 Flo</h1>
+            <p class="subtitle">AI智能滑雪和单板滑雪技术指导</p>
+            
+            <div class="sport-selection">
+                <h2>选择您的运动项目</h2>
+                <div class="sport-buttons">
+                    <button class="sport-btn" data-sport="ski">
+                        <span class="sport-icon">⛷️</span>
+                        <span>双板</span>
+                    </button>
+                    <button class="sport-btn" data-sport="snowboard">
+                        <span class="sport-icon">🏂</span>
+                        <span>单板</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="terrain-selection" id="terrainSection" style="display: none;">
+                <h2>选择地形</h2>
+                <div class="terrain-options">
+                    <button class="terrain-btn" data-terrain="flat">
+                        <span class="terrain-label">平地 / 绿道</span>
+                        <span class="terrain-desc">初级地形</span>
+                    </button>
+                    <button class="terrain-btn" data-terrain="blue">
+                        <span class="terrain-label">蓝道</span>
+                        <span class="terrain-desc">中级地形</span>
+                    </button>
+                    <button class="terrain-btn" data-terrain="black">
+                        <span class="terrain-label">黑道</span>
+                        <span class="terrain-desc">高级陡坡</span>
+                    </button>
+                    <button class="terrain-btn" data-terrain="mogul">
+                        <span class="terrain-label">蘑菇道</span>
+                        <span class="terrain-desc">雪包地形</span>
+                    </button>
+                    <button class="terrain-btn" data-terrain="freestyle">
+                        <span class="terrain-label">自由式</span>
+                        <span class="terrain-desc">公园、跳台、道具</span>
+                    </button>
+                </div>
+                <div class="selected-terrain" id="selectedTerrain"></div>
+            </div>
+
+            <div class="upload-section" id="uploadSection" style="display: none;">
+                <h2>上传您的视频</h2>
+                <div class="upload-area" id="uploadArea">
+                    <input type="file" id="videoInput" accept="video/*" style="display: none;">
+                    <div class="upload-icon">📹</div>
+                    <p class="upload-text">拖拽视频到此处或点击浏览</p>
+                    <p class="upload-hint">支持 MP4、MOV、AVI、WEBM 格式（最大 100MB）</p>
+                </div>
+                <div class="selected-sport" id="selectedSport"></div>
+                <button class="upload-btn" id="uploadBtn" disabled>上传视频</button>
+                <div class="upload-progress" id="uploadProgress" style="display: none;">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <p class="progress-text" id="progressText">上传中... 0%</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="landing.js"></script>
+</body>
+</html>
+

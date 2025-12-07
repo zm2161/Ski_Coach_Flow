@@ -1,0 +1,568 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', '微软雅黑', sans-serif;
+    background: #1a1a1a;
+    color: #ffffff;
+    line-height: 1.6;
+}
+
+.container {
+    min-height: 100vh;
+    padding: 20px;
+}
+
+/* Landing Page Styles */
+.landing-page {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+}
+
+.landing-content {
+    max-width: 600px;
+    width: 100%;
+    text-align: center;
+}
+
+.landing-content h1 {
+    font-size: 2.5rem;
+    margin-bottom: 10px;
+    color: #00d4aa;
+}
+
+.subtitle {
+    font-size: 1.2rem;
+    color: #cccccc;
+    margin-bottom: 40px;
+}
+
+.sport-selection {
+    margin-bottom: 40px;
+}
+
+.sport-selection h2 {
+    font-size: 1.5rem;
+    margin-bottom: 20px;
+    color: #ffffff;
+}
+
+.sport-buttons {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+}
+
+.sport-btn {
+    flex: 1;
+    padding: 30px;
+    background: #2d2d2d;
+    border: 2px solid #444;
+    border-radius: 12px;
+    color: #ffffff;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+.sport-btn:hover {
+    border-color: #00d4aa;
+    background: #333;
+    transform: translateY(-2px);
+}
+
+.sport-btn.selected {
+    border-color: #00d4aa;
+    background: #003d33;
+}
+
+.sport-icon {
+    font-size: 3rem;
+}
+
+.terrain-selection {
+    margin-top: 40px;
+}
+
+.terrain-selection h2 {
+    font-size: 1.5rem;
+    margin-bottom: 20px;
+    color: #ffffff;
+}
+
+.terrain-options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.terrain-btn {
+    padding: 20px 15px;
+    background: #2d2d2d;
+    border: 2px solid #444;
+    border-radius: 12px;
+    color: #ffffff;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.terrain-btn:hover {
+    border-color: #00d4aa;
+    background: #333;
+    transform: translateY(-2px);
+}
+
+.terrain-btn.selected {
+    border-color: #00d4aa;
+    background: #003d33;
+}
+
+.terrain-label {
+    font-size: 1.1rem;
+    font-weight: bold;
+    color: #ffffff;
+}
+
+.terrain-desc {
+    font-size: 0.85rem;
+    color: #cccccc;
+}
+
+.selected-terrain {
+    margin: 15px 0;
+    padding: 10px;
+    background: #003d33;
+    border-radius: 8px;
+    color: #00d4aa;
+    font-weight: bold;
+    text-align: center;
+}
+
+.upload-section {
+    margin-top: 40px;
+}
+
+.upload-section h2 {
+    font-size: 1.5rem;
+    margin-bottom: 20px;
+}
+
+.upload-area {
+    border: 3px dashed #444;
+    border-radius: 12px;
+    padding: 60px 20px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: #2d2d2d;
+}
+
+.upload-area:hover {
+    border-color: #00d4aa;
+    background: #333;
+}
+
+.upload-area.dragover {
+    border-color: #00d4aa;
+    background: #003d33;
+}
+
+.upload-icon {
+    font-size: 4rem;
+    margin-bottom: 20px;
+}
+
+.upload-text {
+    font-size: 1.2rem;
+    margin-bottom: 10px;
+    color: #ffffff;
+}
+
+.upload-hint {
+    font-size: 0.9rem;
+    color: #999;
+}
+
+.selected-sport {
+    margin: 20px 0;
+    padding: 10px;
+    background: #003d33;
+    border-radius: 8px;
+    color: #00d4aa;
+    font-weight: bold;
+}
+
+.upload-btn {
+    width: 100%;
+    padding: 15px;
+    background: #00d4aa;
+    border: none;
+    border-radius: 8px;
+    color: #1a1a1a;
+    font-size: 1.1rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-top: 20px;
+}
+
+.upload-btn:hover:not(:disabled) {
+    background: #00b894;
+    transform: translateY(-2px);
+}
+
+.upload-btn:disabled {
+    background: #444;
+    cursor: not-allowed;
+    color: #666;
+}
+
+.upload-progress {
+    margin-top: 20px;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 10px;
+    background: #444;
+    border-radius: 5px;
+    overflow: hidden;
+    margin-bottom: 10px;
+}
+
+.progress-fill {
+    height: 100%;
+    background: #00d4aa;
+    width: 0%;
+    transition: width 0.3s ease;
+}
+
+.progress-text {
+    text-align: center;
+    color: #cccccc;
+}
+
+/* Analysis Page Styles */
+.analysis-page {
+    padding: 0;
+}
+
+.analysis-layout {
+    display: grid;
+    grid-template-columns: 60% 40%;
+    gap: 20px;
+    height: 100vh;
+    padding: 20px;
+}
+
+.video-section {
+    background: #2d2d2d;
+    border-radius: 12px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+}
+
+#videoPlayer {
+    width: 100%;
+    max-height: calc(100vh - 150px);
+    border-radius: 8px;
+    background: #000;
+}
+
+.video-controls {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-top: 15px;
+}
+
+.control-btn {
+    padding: 10px 20px;
+    background: #00d4aa;
+    border: none;
+    border-radius: 6px;
+    color: #1a1a1a;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.control-btn:hover {
+    background: #00b894;
+}
+
+.time-display {
+    color: #cccccc;
+    font-size: 0.9rem;
+}
+
+.coaching-section {
+    background: #2d2d2d;
+    border-radius: 12px;
+    padding: 20px;
+    overflow-y: auto;
+}
+
+.coaching-section h2 {
+    font-size: 1.5rem;
+    margin-bottom: 20px;
+    color: #00d4aa;
+    position: sticky;
+    top: 0;
+    background: #2d2d2d;
+    padding-bottom: 10px;
+    z-index: 10;
+}
+
+.coaching-windows {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.coaching-window {
+    background: #ffffff;
+    color: #1a1a1a;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    transition: all 0.3s ease;
+    cursor: pointer;
+    border-left: 4px solid #00d4aa;
+}
+
+.coaching-window:hover {
+    transform: translateX(-5px);
+    box-shadow: 0 6px 12px rgba(0, 212, 170, 0.3);
+}
+
+.coaching-window.new {
+    animation: slideIn 0.5s ease;
+    border-left-color: #ff9500;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.coaching-window-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.coaching-window-title {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #1a1a1a;
+}
+
+.coaching-window-timestamp {
+    background: #00d4aa;
+    color: #1a1a1a;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: bold;
+}
+
+.coaching-window.new .coaching-window-timestamp {
+    background: #ff9500;
+}
+
+.coaching-window-text {
+    font-size: 1rem;
+    line-height: 1.6;
+    color: #333;
+    margin-top: 10px;
+}
+
+.loading {
+    text-align: center;
+    padding: 40px;
+    color: #cccccc;
+}
+
+/* Practice Recommendations Styles */
+.practice-recommendations {
+    background: linear-gradient(135deg, #003d33 0%, #005d4d 100%);
+    border-radius: 12px;
+    padding: 30px;
+    margin-bottom: 20px;
+    box-shadow: 0 8px 16px rgba(0, 212, 170, 0.3);
+    animation: slideIn 0.5s ease;
+}
+
+.practice-header {
+    text-align: center;
+    margin-bottom: 30px;
+    color: #ffffff;
+}
+
+.practice-header h3 {
+    font-size: 1.8rem;
+    margin-bottom: 10px;
+    color: #00d4aa;
+}
+
+.practice-subtitle {
+    font-size: 1rem;
+    color: #cccccc;
+    margin-top: 5px;
+}
+
+.practice-list {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.practice-item {
+    background: #ffffff;
+    border-radius: 10px;
+    padding: 20px;
+    display: flex;
+    gap: 20px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.practice-item:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+}
+
+.practice-number {
+    min-width: 40px;
+    height: 40px;
+    background: #00d4aa;
+    color: #1a1a1a;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    font-weight: bold;
+    flex-shrink: 0;
+}
+
+.practice-content {
+    flex: 1;
+    color: #1a1a1a;
+}
+
+.practice-title {
+    display: flex;
+    align-items: baseline;
+    gap: 15px;
+    margin-bottom: 12px;
+}
+
+.practice-name-cn {
+    font-size: 1.3rem;
+    font-weight: bold;
+    color: #1a1a1a;
+}
+
+.practice-name-en {
+    font-size: 0.95rem;
+    color: #666;
+    font-style: italic;
+}
+
+.practice-description {
+    font-size: 1rem;
+    line-height: 1.6;
+    color: #333;
+    margin-bottom: 15px;
+}
+
+.practice-key-points {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 2px solid #e0e0e0;
+}
+
+.practice-key-points strong {
+    color: #00d4aa;
+    font-size: 0.95rem;
+}
+
+.practice-key-points ul {
+    list-style: none;
+    padding-left: 0;
+    margin-top: 8px;
+}
+
+.practice-key-points li {
+    padding: 5px 0;
+    padding-left: 20px;
+    position: relative;
+    color: #555;
+    font-size: 0.95rem;
+}
+
+.practice-key-points li:before {
+    content: "✓";
+    position: absolute;
+    left: 0;
+    color: #00d4aa;
+    font-weight: bold;
+}
+
+.error {
+    background: #ff4444;
+    color: #ffffff;
+    padding: 15px;
+    border-radius: 8px;
+    margin: 20px 0;
+}
+
+/* Responsive Design */
+@media (max-width: 968px) {
+    .analysis-layout {
+        grid-template-columns: 1fr;
+        height: auto;
+    }
+
+    .video-section {
+        max-height: 50vh;
+    }
+
+    .coaching-section {
+        max-height: 50vh;
+    }
+}
+
+@media (max-width: 600px) {
+    .sport-buttons {
+        flex-direction: column;
+    }
+
+    .landing-content h1 {
+        font-size: 2rem;
+    }
+}
+

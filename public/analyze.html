@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>视频分析 - Flo</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container analysis-page">
+        <div class="analysis-layout">
+            <!-- Video Player Section -->
+            <div class="video-section">
+                <video id="videoPlayer" controls>
+                    <source id="videoSource" src="" type="video/mp4">
+                    您的浏览器不支持视频标签。
+                </video>
+                <div class="video-controls">
+                    <button id="playPauseBtn" class="control-btn">▶️ 播放</button>
+                    <span class="time-display">
+                        <span id="currentTime">0:00</span> / <span id="totalTime">0:00</span>
+                    </span>
+                </div>
+            </div>
+
+            <!-- Coaching Windows Section -->
+            <div class="coaching-section">
+                <h2>教练反馈</h2>
+                <div class="coaching-windows" id="coachingWindows">
+                    <!-- Coaching windows will be dynamically inserted here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="analyze.js"></script>
+</body>
+</html>
+

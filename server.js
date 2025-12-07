@@ -6,6 +6,7 @@ const cors = require('cors');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const ffmpeg = require('fluent-ffmpeg');
 const { execSync } = require('child_process');
+const { generateUploadURL } = require('@vercel/blob');
 require('dotenv').config();
 
 const app = express();
@@ -64,7 +65,10 @@ const upload = multer({
 });
 
 // Initialize Gemini AI
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || 'AIzaSyDZWUEqfCe8ZA2jVulhioiNtgz1-yIGCL4');
+if (!process.env.GEMINI_API_KEY) {
+  console.warn('[Gemini] No GEMINI_API_KEY set');
+}
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 // Helper function to list available models (for debugging)
 async function listAvailableModels() {
@@ -353,7 +357,6 @@ ${JSON.stringify(scenesWithFrames, null, 2)}
   try {
     console.log('[Gemini] Sending request to Gemini 2.5 Flash...');
     console.log('[Gemini] Prompt length:', prompt.length, 'characters');
-    console.log('[Gemini] Using API key: AIzaSyDZWUEqfCe8ZA2jVulhioiNtgz1-yIGCL4');
     
     const result = await textModel.generateContent(prompt);
     const response = await result.response;
@@ -543,6 +546,49 @@ function getDefaultRecommendations(sport) {
 }
 
 // Routes
+app.post('/api/blob-upload-url', async (req, res) => {
+  try {
+    const uploadURL = await generateUploadURL({ token: process.env.BLOB_READ_WRITE_TOKEN });
+    res.json({ uploadURL });
+  } catch (e) {
+    res.status(500).json({ error: 'Blob token invalid or missing' });
+  }
+});
+
+app.post('/api/analyze', async (req, res) => {
+  try {
+    const { blobUrl, sport = 'ski', terrain = 'blue', duration = 30 } = req.body;
+    const fps = 30;
+    const scenes = segmentVideoUniform(duration, fps);
+    const coaching = await generateCoachingAnalysis(scenes, sport, null, fps, terrain);
+    const practiceRecommendations = await generatePracticeRecommendations(sport, coaching);
+    const videoId = Date.now().toString();
+    videoData.set(videoId, {
+      id: videoId,
+      url: blobUrl,
+      sport,
+      terrain,
+      duration,
+      fps,
+      scenes,
+      coaching,
+      practiceRecommendations
+    });
+    res.json({
+      videoId,
+      url: blobUrl,
+      duration,
+      fps,
+      coaching,
+      practiceRecommendations,
+      sport,
+      terrain
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message || '分析失败' });
+  }
+});
+
 app.post('/api/upload', (req, res) => {
   upload.single('video')(req, res, async (err) => {
     // Handle multer errors

@@ -129,54 +129,46 @@ document.addEventListener('DOMContentLoaded', () => {
         uploadBtn.disabled = true;
 
         try {
-            const xhr = new XMLHttpRequest();
-            
-            xhr.upload.addEventListener('progress', (e) => {
-                if (e.lengthComputable) {
-                    const percentComplete = (e.loaded / e.total) * 100;
-                    progressFill.style.width = percentComplete + '%';
-                    progressText.textContent = `上传中... ${Math.round(percentComplete)}%`;
-                }
-            });
+            const urlRes = await fetch('/api/blob-upload-url', { method: 'POST' });
+            if (!urlRes.ok) {
+                throw new Error('获取上传链接失败');
+            }
+            const { uploadURL } = await urlRes.json();
 
-            xhr.addEventListener('load', () => {
-                if (xhr.status === 200) {
-                    const response = JSON.parse(xhr.responseText);
-                    // Redirect to analysis page with video data
-                    sessionStorage.setItem('videoData', JSON.stringify({
-                        videoId: response.videoId,
-                        url: response.url,
-                        duration: response.duration,
-                        fps: response.fps || 30,
-                        coaching: response.coaching,
-                        practiceRecommendations: response.practiceRecommendations || [],
-                        sport: selectedSport,
-                        terrain: selectedTerrain
-                    }));
-                    window.location.href = 'analyze.html';
-                } else {
-                    // Try to parse error message from response
-                    let errorMessage = '上传失败，请重试。';
-                    try {
-                        const errorResponse = JSON.parse(xhr.responseText);
-                        errorMessage = errorResponse.error || errorMessage;
-                    } catch (e) {
-                        errorMessage = `上传失败（状态码 ${xhr.status}），请重试。`;
-                    }
-                    alert(errorMessage);
-                    uploadProgress.style.display = 'none';
-                    uploadBtn.disabled = false;
-                }
+            const putRes = await fetch(uploadURL, {
+                method: 'PUT',
+                headers: { 'Content-Type': selectedFile.type },
+                body: selectedFile
             });
+            if (!putRes.ok) {
+                throw new Error('上传到存储失败');
+            }
+            const putJson = await putRes.json();
+            const blobUrl = putJson.url || putJson?.pathname ? `https://blob.vercel-storage.com${putJson.pathname}` : null;
+            if (!blobUrl) {
+                throw new Error('无法获取文件URL');
+            }
 
-            xhr.addEventListener('error', () => {
-                alert('网络错误，请检查您的连接后重试。');
-                uploadProgress.style.display = 'none';
-                uploadBtn.disabled = false;
+            const analyzeRes = await fetch('/api/analyze', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ blobUrl, sport: selectedSport, terrain: selectedTerrain, duration })
             });
-
-            xhr.open('POST', '/api/upload');
-            xhr.send(formData);
+            if (!analyzeRes.ok) {
+                throw new Error('分析失败');
+            }
+            const response = await analyzeRes.json();
+            sessionStorage.setItem('videoData', JSON.stringify({
+                videoId: response.videoId,
+                url: response.url,
+                duration: response.duration,
+                fps: response.fps || 30,
+                coaching: response.coaching,
+                practiceRecommendations: response.practiceRecommendations || [],
+                sport: selectedSport,
+                terrain: selectedTerrain
+            }));
+            window.location.href = 'analyze.html';
         } catch (error) {
             console.error('Upload error:', error);
             alert('上传失败，请重试。');

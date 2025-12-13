@@ -63,3 +63,4 @@ echo ""
 trap "kill $SERVER_PID $NGROK_PID 2>/dev/null; exit" INT
 wait
 
+

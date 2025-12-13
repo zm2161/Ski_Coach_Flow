@@ -17,12 +17,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     videoData = JSON.parse(storedData);
     
+    // Get API base for video URL
+    const API_BASE = videoData.apiBase || '';
+    
     // Show loading state
     const container = document.getElementById('coachingWindows');
     container.innerHTML = '<div class="loading">正在加载视频和分析...</div>';
     
-    // Set video source
-    document.getElementById('videoSource').src = videoData.url;
+    // Set video source - use full URL if API_BASE is set
+    const videoUrl = videoData.url.startsWith('http') ? videoData.url : (API_BASE + videoData.url);
+    document.getElementById('videoSource').src = videoUrl;
     videoPlayer.load();
     
     // Clear loading state once video is ready

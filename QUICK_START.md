@@ -49,3 +49,4 @@
 - **Server not starting**: Make sure port 3000 is available, or set a different PORT in `.env`
 - **Analysis not appearing**: Check that your Gemini API key is correct in `.env` or server.js
 
+

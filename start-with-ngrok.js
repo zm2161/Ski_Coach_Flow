@@ -1,14 +1,15 @@
 const ngrok = require('ngrok');
 const { spawn } = require('child_process');
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3011;
 
 async function startServerWithNgrok() {
   // Start the Express server
   console.log('Starting Express server...');
   const server = spawn('node', ['server.js'], {
     stdio: 'inherit',
-    shell: true
+    shell: true,
+    env: { ...process.env, PORT: String(PORT) }
   });
 
   // Wait a bit for server to start
@@ -17,9 +18,11 @@ async function startServerWithNgrok() {
   try {
     // Start ngrok tunnel
     console.log('Starting ngrok tunnel...');
+    try { await ngrok.kill(); } catch (_) {}
     const url = await ngrok.connect({
       addr: PORT,
-      authtoken: null, // Use free tier, or set NGROK_AUTHTOKEN env var
+      authtoken: process.env.NGROK_AUTHTOKEN || undefined,
+      region: process.env.NGROK_REGION || 'us'
     });
 
     console.log('\n✅ ===========================================');

@@ -1,20 +1,60 @@
+// Load environment variables first
+require('dotenv').config();
+
 const express = require('express');
+const cors = require('cors');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const cors = require('cors');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
-const ffmpeg = require('fluent-ffmpeg');
-const { execSync } = require('child_process');
-const { generateUploadURL } = require('@vercel/blob');
-require('dotenv').config();
+// Railway deployment - FFmpeg is available
+const IS_VERCEL = !!process.env.VERCEL;
+let ffmpeg;
+let execSync;
+if (!IS_VERCEL) {
+  ffmpeg = require('fluent-ffmpeg');
+  execSync = require('child_process').execSync;
+}
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
-app.use(cors());
-app.use(express.json());
+// CORS configuration - allow Vercel frontend and Railway backend
+const allowedOrigins = [
+  'https://traeskiingcoach8oba-naif6t401-jennys-projects-d204687a.vercel.app',
+  /^https:\/\/.*\.vercel\.app$/,
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://127.0.0.1:3000'
+];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // Check if origin is in allowed list
+    if (allowedOrigins.some(allowed => {
+      if (typeof allowed === 'string') {
+        return origin === allowed;
+      } else if (allowed instanceof RegExp) {
+        return allowed.test(origin);
+      }
+      return false;
+    })) {
+      callback(null, true);
+    } else {
+      callback(null, true); // For now, allow all origins (can restrict later)
+    }
+  },
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'X-Requested-With', 'Authorization'],
+  credentials: false
+}));
+
+
+app.use(express.json({ limit: '100mb' }));
+app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 app.use(express.static('public'));
 app.use('/uploads', express.static('uploads'));
 
@@ -65,6 +105,9 @@ const upload = multer({
 });
 
 // Initialize Gemini AI
+// Debug: Check GEMINI_API_KEY (only print length, not the actual key)
+console.log('GEMINI_API_KEY length:', process.env.GEMINI_API_KEY?.length || 0);
+
 if (!process.env.GEMINI_API_KEY) {
   console.warn('[Gemini] No GEMINI_API_KEY set');
 }
@@ -546,14 +589,7 @@ function getDefaultRecommendations(sport) {
 }
 
 // Routes
-app.post('/api/blob-upload-url', async (req, res) => {
-  try {
-    const uploadURL = await generateUploadURL({ token: process.env.BLOB_READ_WRITE_TOKEN });
-    res.json({ uploadURL });
-  } catch (e) {
-    res.status(500).json({ error: 'Blob token invalid or missing' });
-  }
-});
+// Note: Vercel Blob upload removed - all uploads go directly to /api/upload
 
 app.post('/api/analyze', async (req, res) => {
   try {
@@ -589,92 +625,103 @@ app.post('/api/analyze', async (req, res) => {
   }
 });
 
-app.post('/api/upload', (req, res) => {
-  upload.single('video')(req, res, async (err) => {
-    // Handle multer errors
-    if (err) {
-      console.error('Multer error:', err);
-      return res.status(400).json({ error: err.message || '文件上传失败' });
+// ⭐ 显式处理预检 OPTIONS（保险一点）
+app.options('/api/upload', (req, res) => {
+  res.sendStatus(204); // 预检直接 204 + CORS 头（由 cors 中间件自动加）
+});
+
+app.post('/api/upload', upload.single('video'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: '未提供视频文件' });
     }
-    
-    try {
-      if (!req.file) {
-        return res.status(400).json({ error: '未提供视频文件' });
-      }
 
       const sport = req.body.sport || 'ski';
       const terrain = req.body.terrain || 'blue';
       const duration = parseFloat(req.body.duration) || 30;
       
-      // Get video metadata (duration, fps, frame count)
-      console.log('[Upload] Getting video metadata...');
-      let videoMetadata;
-      try {
-        videoMetadata = await getVideoMetadata(req.file.path);
-        console.log(`[Upload] Video metadata: duration=${videoMetadata.duration}s, fps=${videoMetadata.fps}, frames=${videoMetadata.frameCount}`);
-      } catch (error) {
-        console.error('[Upload] Error getting metadata, using defaults:', error);
-        videoMetadata = { duration, fps: 30, frameCount: Math.floor(duration * 30) };
-      }
-      
-      // Segment the video based on motion analysis
-      console.log('[Upload] Analyzing motion and segmenting video...');
-      const scenes = await segmentVideoWithMotion(req.file.path, videoMetadata.duration, videoMetadata.fps);
-      console.log(`[Upload] Created ${scenes.length} segments based on motion analysis`);
-      
-      // Generate coaching analysis
-      console.log(`[Upload] Starting coaching analysis for ${sport} video, terrain: ${terrain}, ${scenes.length} scenes`);
-      const coachingData = await generateCoachingAnalysis(scenes, sport, req.file.path, videoMetadata.fps, terrain);
-      console.log(`[Upload] Coaching analysis complete, generated ${coachingData.scenes?.length || 0} coaching windows`);
-      
-      // Generate practice recommendations
-      console.log('[Upload] Generating practice recommendations...');
-      const practiceRecommendations = await generatePracticeRecommendations(sport, coachingData);
-      console.log('[Upload] Practice recommendations generated');
-      
-      // Store video data
-      const videoId = Date.now().toString();
-      const videoUrl = `/uploads/${req.file.filename}`;
-      
-      videoData.set(videoId, {
-        id: videoId,
-        filename: req.file.filename,
-        path: req.file.path,
-        url: videoUrl,
-        sport: sport,
-        terrain: terrain,
-        duration: videoMetadata.duration,
-        fps: videoMetadata.fps,
-        scenes: scenes,
-        coaching: coachingData,
-        practiceRecommendations: practiceRecommendations
-      });
-
-      res.json({
-        videoId: videoId,
-        url: videoUrl,
-        duration: videoMetadata.duration,
-        fps: videoMetadata.fps,
-        coaching: coachingData,
-        practiceRecommendations: practiceRecommendations,
-        sport: sport,
-        terrain: terrain
-      });
+    // Get video metadata (duration, fps, frame count)
+    console.log('[Upload] Getting video metadata...');
+    let videoMetadata;
+    try {
+      videoMetadata = await getVideoMetadata(req.file.path);
+      console.log(`[Upload] Video metadata: duration=${videoMetadata.duration}s, fps=${videoMetadata.fps}, frames=${videoMetadata.frameCount}`);
     } catch (error) {
-      console.error('[Upload] ❌ Error:', error.message);
-      console.error('[Upload] Error stack:', error.stack);
-      
-      // If it's a Gemini API error, provide helpful message
-      if (error.message.includes('Gemini API error')) {
-        res.status(500).json({ 
-          error: error.message,
-          details: 'AI分析服务无响应。请检查您的API密钥或稍后重试。'
-        });
-      } else {
-        res.status(500).json({ error: error.message || '上传过程中发生错误' });
+      console.error('[Upload] Error getting metadata, using defaults:', error);
+      videoMetadata = { duration, fps: 30, frameCount: Math.floor(duration * 30) };
+    }
+    
+    // Segment the video based on motion analysis
+    console.log('[Upload] Analyzing motion and segmenting video...');
+    const scenes = await segmentVideoWithMotion(req.file.path, videoMetadata.duration, videoMetadata.fps);
+    console.log(`[Upload] Created ${scenes.length} segments based on motion analysis`);
+    
+    // Generate coaching analysis
+    console.log(`[Upload] Starting coaching analysis for ${sport} video, terrain: ${terrain}, ${scenes.length} scenes`);
+    const coachingData = await generateCoachingAnalysis(scenes, sport, req.file.path, videoMetadata.fps, terrain);
+    console.log(`[Upload] Coaching analysis complete, generated ${coachingData.scenes?.length || 0} coaching windows`);
+    
+    // Generate practice recommendations
+    console.log('[Upload] Generating practice recommendations...');
+    const practiceRecommendations = await generatePracticeRecommendations(sport, coachingData);
+    console.log('[Upload] Practice recommendations generated');
+    
+    // Store video data
+    const videoId = Date.now().toString();
+    const videoUrl = `/uploads/${req.file.filename}`;
+    
+    videoData.set(videoId, {
+      id: videoId,
+      filename: req.file.filename,
+      path: req.file.path,
+      url: videoUrl,
+      sport: sport,
+      terrain: terrain,
+      duration: videoMetadata.duration,
+      fps: videoMetadata.fps,
+      scenes: scenes,
+      coaching: coachingData,
+      practiceRecommendations: practiceRecommendations
+    });
+
+    res.json({
+      videoId: videoId,
+      url: videoUrl,
+      duration: videoMetadata.duration,
+      fps: videoMetadata.fps,
+      coaching: coachingData,
+      practiceRecommendations: practiceRecommendations,
+      sport: sport,
+      terrain: terrain
+    });
+  } catch (error) {
+    console.error('[Upload] ❌ Error:', error.message);
+    console.error('[Upload] Error stack:', error.stack);
+    
+    // Handle multer errors specifically
+    if (error instanceof multer.MulterError) {
+      return res.status(400).json({ error: error.message || '文件上传失败' });
+    }
+    
+    // If it's a Gemini API error, provide helpful message
+    if (error.message.includes('Gemini API error')) {
+      res.status(500).json({ 
+        error: error.message,
+        details: 'AI分析服务无响应。请检查您的API密钥或稍后重试。'
+      });
+    } else {
+      res.status(500).json({ error: error.message || '上传过程中发生错误' });
+    }
+
+    // Clean up uploaded file on error
+    if (req.file && req.file.path) {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch (unlinkErr) {
+        console.error('[Upload] Error deleting file:', unlinkErr);
       }
     }
-  });
+  }
 });
 
 app.get('/api/video/:videoId', (req, res) => {
@@ -699,7 +746,13 @@ app.get('/api/video/:videoId/coaching', (req, res) => {
   res.json(data.coaching);
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+// Start server (Railway or local development)
+// Railway will set PORT automatically, local dev uses 3000
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`📡 CORS enabled for Vercel frontend`);
+  console.log(`🎬 FFmpeg available: ${!IS_VERCEL ? 'Yes' : 'No (Vercel)'}`);
 });
 
+// Export for Vercel serverless (if needed)
+module.exports = app;

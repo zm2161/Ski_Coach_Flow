@@ -258,23 +258,59 @@ document.addEventListener('DOMContentLoaded', () => {
             if (useLocalBackend) {
                 console.log(`[Upload] ✅ 使用本地后端: ${currentApiBase}/api/upload`);
                 
+                // Show initial progress
+                progressFill.style.width = '1%';
+                progressText.textContent = '连接中...';
+                
                 // Show progress for ngrok upload
                 const xhr = new XMLHttpRequest();
+                let uploadStarted = false;
+                let lastProgress = 0;
+                
+                // Add timeout (5 minutes for large files)
+                const timeout = setTimeout(() => {
+                    if (!uploadStarted) {
+                        console.error('[Upload] 连接超时');
+                        xhr.abort();
+                        reject(new Error('连接超时，请检查网络和ngrok连接'));
+                    }
+                }, 10000); // 10秒连接超时
+                
+                xhr.upload.addEventListener('loadstart', () => {
+                    uploadStarted = true;
+                    clearTimeout(timeout);
+                    console.log('[Upload] 开始上传...');
+                    progressText.textContent = '上传中... 0%';
+                });
                 
                 xhr.upload.addEventListener('progress', (e) => {
-                    if (e.lengthComputable) {
+                    if (e.lengthComputable && e.total > 0) {
                         const percentComplete = (e.loaded / e.total) * 100;
+                        lastProgress = percentComplete;
                         progressFill.style.width = percentComplete + '%';
                         progressText.textContent = `上传中... ${Math.round(percentComplete)}%`;
+                        console.log(`[Upload] 进度: ${Math.round(percentComplete)}% (${(e.loaded / 1024 / 1024).toFixed(2)}MB / ${(e.total / 1024 / 1024).toFixed(2)}MB)`);
+                    } else {
+                        // If not computable, show indeterminate progress
+                        progressText.textContent = '上传中...';
                     }
+                });
+                
+                xhr.upload.addEventListener('load', () => {
+                    console.log('[Upload] 文件上传完成，等待服务器处理...');
+                    progressText.textContent = '处理中...';
                 });
                 
                 return new Promise((resolve, reject) => {
                     xhr.addEventListener('load', () => {
+                        clearTimeout(timeout);
                         if (xhr.status === 200) {
                             try {
                                 const response = JSON.parse(xhr.responseText);
                                 console.log('[Upload] 上传成功:', response);
+                                progressText.textContent = '完成！';
+                                progressFill.style.width = '100%';
+                                
                                 sessionStorage.setItem('videoData', JSON.stringify({
                                     videoId: response.videoId,
                                     url: `${currentApiBase}${response.url}`,
@@ -286,10 +322,14 @@ document.addEventListener('DOMContentLoaded', () => {
                                     terrain: selectedTerrain,
                                     apiBase: currentApiBase
                                 }));
-                                window.location.href = 'analyze.html';
+                                
+                                // Small delay to show completion
+                                setTimeout(() => {
+                                    window.location.href = 'analyze.html';
+                                }, 500);
                                 resolve();
                             } catch (e) {
-                                console.error('[Upload] JSON解析错误:', e);
+                                console.error('[Upload] JSON解析错误:', e, '响应:', xhr.responseText);
                                 reject(new Error('响应解析失败'));
                             }
                         } else {
@@ -298,77 +338,50 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                     });
                     
-                    xhr.addEventListener('error', () => {
-                        console.error('[Upload] 网络错误');
-                        reject(new Error('网络错误，请检查ngrok连接'));
+                    xhr.addEventListener('error', (e) => {
+                        clearTimeout(timeout);
+                        console.error('[Upload] 网络错误:', e);
+                        progressText.textContent = '网络错误';
+                        reject(new Error('网络错误，请检查ngrok连接。如果这是第一次访问ngrok URL，请先在浏览器中访问一次并点击"Visit Site"'));
                     });
                     
+                    xhr.addEventListener('abort', () => {
+                        clearTimeout(timeout);
+                        console.error('[Upload] 请求被中止');
+                        progressText.textContent = '已取消';
+                        reject(new Error('上传被取消或超时'));
+                    });
+                    
+                    xhr.addEventListener('timeout', () => {
+                        clearTimeout(timeout);
+                        console.error('[Upload] 请求超时');
+                        progressText.textContent = '超时';
+                        reject(new Error('上传超时，请检查网络连接'));
+                    });
+                    
+                    // Set timeout for the entire request (10 minutes)
+                    xhr.timeout = 600000;
+                    
                     xhr.open('POST', `${currentApiBase}/api/upload`);
-                    // Add ngrok skip browser warning header
-                    xhr.setRequestHeader('ngrok-skip-browser-warning', 'true');
+                    console.log('[Upload] 发送请求到:', `${currentApiBase}/api/upload`);
+                    console.log('[Upload] 文件大小:', (selectedFile.size / 1024 / 1024).toFixed(2), 'MB');
+                    
                     xhr.send(formData);
                 });
             }
             
-            // Vercel blob upload path (fallback) - should not reach here if API_BASE is set
+            // Should not reach here if API_BASE is set
             const urlParamCheck = new URLSearchParams(window.location.search).get('apiBase');
             if (urlParamCheck) {
-                console.error('[Upload] ❌ 严重错误：URL参数中有apiBase但代码走到了Vercel上传路径！');
+                console.error('[Upload] ❌ 严重错误：URL参数中有apiBase但代码走到了fallback路径！');
                 console.error('[Upload] 这不应该发生，请检查getApiBase()函数');
                 alert(`配置错误：检测到apiBase参数但未使用！\n\nURL参数: ${urlParamCheck}\n\n请刷新页面重试，或检查浏览器控制台。`);
                 throw new Error('API_BASE配置错误：URL参数存在但未使用');
             }
             
-            console.warn('[Upload] ⚠️ 未检测到API_BASE，尝试使用Vercel blob上传（这需要BLOB_READ_WRITE_TOKEN）');
-            const urlRes = await fetch('/api/blob-upload-url', { method: 'POST' });
-            if (!urlRes.ok) {
-                const errorText = await urlRes.text();
-                console.error('[Upload] ❌ Vercel blob上传失败:', urlRes.status, errorText);
-                throw new Error(`获取上传链接失败（状态码 ${urlRes.status}）。\n\n请确保URL中包含 apiBase 参数，例如:\n?apiBase=https://your-ngrok-url.ngrok-free.dev\n\n当前URL: ${window.location.href}`);
-            }
-            const { uploadURL } = await urlRes.json();
-
-            const putRes = await fetch(uploadURL, {
-                method: 'PUT',
-                headers: { 'Content-Type': selectedFile.type },
-                body: selectedFile
-            });
-            if (!putRes.ok) {
-                throw new Error(`上传到存储失败（状态码 ${putRes.status}）`);
-            }
-            let blobUrl = putRes.headers.get('location') || putRes.headers.get('Location');
-            if (!blobUrl) {
-                try {
-                    const putJson = await putRes.json();
-                    blobUrl = putJson?.url || (putJson?.pathname ? `https://blob.vercel-storage.com${putJson.pathname}` : null);
-                } catch (_) {
-                    // ignore parse error
-                }
-            }
-            if (!blobUrl) {
-                throw new Error('无法获取文件URL');
-            }
-
-            const analyzeRes = await fetch('/api/analyze', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ blobUrl, sport: selectedSport, terrain: selectedTerrain, duration })
-            });
-            if (!analyzeRes.ok) {
-                throw new Error('分析失败');
-            }
-            const response = await analyzeRes.json();
-            sessionStorage.setItem('videoData', JSON.stringify({
-                videoId: response.videoId,
-                url: response.url,
-                duration: response.duration,
-                fps: response.fps || 30,
-                coaching: response.coaching,
-                practiceRecommendations: response.practiceRecommendations || [],
-                sport: selectedSport,
-                terrain: selectedTerrain
-            }));
-            window.location.href = 'analyze.html';
+            // No API_BASE and no localhost - cannot upload
+            console.error('[Upload] ❌ 错误：未检测到API_BASE，无法上传');
+            throw new Error('未配置后端地址。请在URL中添加 apiBase 参数，例如:\n?apiBase=https://your-localtunnel-url.loca.lt');
         } catch (error) {
             console.error('Upload error:', error);
             alert(`上传失败：${error?.message || '请重试。'}`);

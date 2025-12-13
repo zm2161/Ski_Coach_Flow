@@ -6,7 +6,7 @@
 
 ### 1. 确保代码已准备好
 - ✅ `server.js` 已适配 Railway（已完成）
-- ✅ `nixpacks.toml` 配置正确（Node.js 20 + FFmpeg）
+- ✅ `nixpacks.toml` 配置正确（Node.js 18 + FFmpeg）
 - ✅ `package.json` 有 `start` 脚本
 
 ### 2. 准备 GitHub 仓库
@@ -35,7 +35,7 @@
 Railway 会自动：
 - 检测到 Node.js 项目
 - 读取 `nixpacks.toml` 配置
-- 开始构建（安装 Node.js 20 和 FFmpeg）
+- 开始构建（安装 Node.js 18 和 FFmpeg）
 
 **等待构建完成**（通常 2-5 分钟）
 

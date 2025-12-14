@@ -107,17 +107,32 @@ const upload = multer({
 });
 
 // Initialize Gemini AI
-// Debug: Check GEMINI_API_KEY (only print length, not the actual key)
+// Debug: Check GEMINI_API_KEY (only print fingerprint, not the actual key)
 const geminiKey = process.env.GEMINI_API_KEY;
-console.log('GEMINI_API_KEY length:', geminiKey?.length || 0);
-console.log('GEMINI_API_KEY exists:', !!geminiKey);
+console.log('='.repeat(60));
+console.log('🔑 GEMINI_API_KEY Fingerprint (for comparison):');
+console.log('   Length:', geminiKey?.length || 0);
+console.log('   First 10 chars:', geminiKey?.substring(0, 10) || 'NOT SET');
+console.log('   Last 10 chars:', geminiKey?.substring(geminiKey?.length - 10) || 'NOT SET');
+console.log('   Full fingerprint:', geminiKey ? `${geminiKey.substring(0, 10)}...${geminiKey.substring(geminiKey.length - 10)}` : 'NOT SET');
+console.log('='.repeat(60));
 console.log('All env vars starting with GEMINI:', Object.keys(process.env).filter(k => k.startsWith('GEMINI')));
 
 if (!geminiKey) {
   console.warn('[Gemini] ⚠️ No GEMINI_API_KEY set');
   console.warn('[Gemini] Please check Railway Variables and redeploy after adding the key');
 } else {
-  console.log('[Gemini] ✅ GEMINI_API_KEY loaded successfully');
+  // Verify it's the new key (starts with AIzaSyCuDj)
+  const expectedStart = 'AIzaSyCuDj';
+  const expectedEnd = 'K8PZqxIvj8';
+  if (geminiKey.startsWith(expectedStart) && geminiKey.endsWith(expectedEnd)) {
+    console.log('[Gemini] ✅ GEMINI_API_KEY loaded successfully (NEW KEY - matches expected fingerprint)');
+  } else {
+    console.warn('[Gemini] ⚠️ GEMINI_API_KEY loaded but fingerprint does not match expected');
+    console.warn('[Gemini] Expected fingerprint:', `${expectedStart}...${expectedEnd}`);
+    console.warn('[Gemini] Actual fingerprint:', `${geminiKey.substring(0, 10)}...${geminiKey.substring(geminiKey.length - 10)}`);
+    console.warn('[Gemini] Please update Railway Variables with new API key and redeploy');
+  }
 }
 const genAI = new GoogleGenerativeAI(geminiKey || '');
 

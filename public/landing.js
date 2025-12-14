@@ -15,7 +15,16 @@ function getApiBase() {
         return localBase;
     }
     
-    // For Vercel/production, check URL params and localStorage
+    // If on Railway (same domain), use relative paths (no apiBase needed)
+    const isRailway = window.location.hostname.includes('railway.app') || 
+                      window.location.hostname.includes('up.railway.app');
+    
+    if (isRailway) {
+        console.log('[API] Railway 同域部署，使用相对路径');
+        return ''; // Empty string means use relative paths
+    }
+    
+    // For Vercel/production with separate backend, check URL params and localStorage
     const params = new URLSearchParams(window.location.search);
     if (params.get('clearApiBase') === '1') {
         localStorage.removeItem('apiBase');
@@ -69,8 +78,16 @@ function getApiBase() {
         const isLocal = window.location.hostname === 'localhost' || 
                         window.location.hostname === '127.0.0.1' ||
                         window.location.hostname === '';
+        const isRailway = window.location.hostname.includes('railway.app') || 
+                          window.location.hostname.includes('up.railway.app');
         
-        if (apiBase) {
+        if (isRailway && !apiBase) {
+            // Railway same-domain deployment
+            indicator.textContent = '✅ Railway 同域';
+            indicator.title = '前端和后端在同一域名下';
+            indicator.style.background = '#00d4aa';
+            console.log('[API] ✅ Railway 同域部署');
+        } else if (apiBase) {
             const displayText = isLocal 
                 ? `🔗 本地: ${apiBase.replace('http://', '')}`
                 : `🔗 ${apiBase.replace('https://', '').substring(0, 35)}`;
@@ -255,8 +272,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error('API_BASE解析失败');
             }
             
-            if (useLocalBackend) {
-                console.log(`[Upload] ✅ 使用本地后端: ${currentApiBase}/api/upload`);
+            // Use relative path for Railway (same domain) or absolute path for external backend
+            const uploadUrl = currentApiBase ? `${currentApiBase}/api/upload` : '/api/upload';
+            const isRailway = window.location.hostname.includes('railway.app') || 
+                              window.location.hostname.includes('up.railway.app');
+            
+            if (useLocalBackend || !currentApiBase) {
+                console.log(`[Upload] ✅ 使用后端: ${uploadUrl}${isRailway ? ' (Railway 同域)' : ''}`);
                 
                 // Show initial progress
                 progressFill.style.width = '1%';
@@ -311,16 +333,21 @@ document.addEventListener('DOMContentLoaded', () => {
                                 progressText.textContent = '完成！';
                                 progressFill.style.width = '100%';
                                 
+                                // Build video URL - use relative path if on Railway
+                                const videoUrl = currentApiBase 
+                                    ? `${currentApiBase}${response.url}`
+                                    : response.url;
+                                
                                 sessionStorage.setItem('videoData', JSON.stringify({
                                     videoId: response.videoId,
-                                    url: `${currentApiBase}${response.url}`,
+                                    url: videoUrl,
                                     duration: response.duration,
                                     fps: response.fps || 30,
                                     coaching: response.coaching,
                                     practiceRecommendations: response.practiceRecommendations || [],
                                     sport: selectedSport,
                                     terrain: selectedTerrain,
-                                    apiBase: currentApiBase
+                                    apiBase: currentApiBase || ''
                                 }));
                                 
                                 // Small delay to show completion
@@ -342,7 +369,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         clearTimeout(timeout);
                         console.error('[Upload] 网络错误:', e);
                         progressText.textContent = '网络错误';
-                        reject(new Error('网络错误，请检查ngrok连接。如果这是第一次访问ngrok URL，请先在浏览器中访问一次并点击"Visit Site"'));
+                        const errorMsg = isRailway 
+                            ? '网络错误，请检查服务器连接'
+                            : '网络错误，请检查连接';
+                        reject(new Error(errorMsg));
                     });
                     
                     xhr.addEventListener('abort', () => {
@@ -362,8 +392,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Set timeout for the entire request (10 minutes)
                     xhr.timeout = 600000;
                     
-                    xhr.open('POST', `${currentApiBase}/api/upload`);
-                    console.log('[Upload] 发送请求到:', `${currentApiBase}/api/upload`);
+                    xhr.open('POST', uploadUrl);
+                    console.log('[Upload] 发送请求到:', uploadUrl);
                     console.log('[Upload] 文件大小:', (selectedFile.size / 1024 / 1024).toFixed(2), 'MB');
                     
                     xhr.send(formData);

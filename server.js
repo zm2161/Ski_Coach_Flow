@@ -23,6 +23,8 @@ const PORT = process.env.PORT || 3000;
 const allowedOrigins = [
   'https://traeskiingcoach8oba-naif6t401-jennys-projects-d204687a.vercel.app',
   /^https:\/\/.*\.vercel\.app$/,
+  /^https:\/\/.*\.railway\.app$/,
+  /^https:\/\/.*\.up\.railway\.app$/,
   'http://localhost:3000',
   'http://localhost:5173',
   'http://127.0.0.1:3000'

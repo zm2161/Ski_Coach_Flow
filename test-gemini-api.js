@@ -1,7 +1,12 @@
 // Quick test script to check which Gemini models are available
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-const API_KEY = process.env.GEMINI_API_KEY || 'AIzaSyDZWUEqfCe8ZA2jVulhioiNtgz1-yIGCL4';
+const API_KEY = process.env.GEMINI_API_KEY;
+if (!API_KEY) {
+  console.error('❌ GEMINI_API_KEY 环境变量未设置！');
+  console.error('请在 .env 文件中设置 GEMINI_API_KEY，或通过环境变量传入');
+  process.exit(1);
+}
 const genAI = new GoogleGenerativeAI(API_KEY);
 
 const modelsToTest = [

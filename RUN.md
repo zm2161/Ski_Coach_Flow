@@ -62,7 +62,7 @@ If port 3000 is already in use, you can change it:
 1. Create a `.env` file in the project root:
 ```
 PORT=3001
-GEMINI_API_KEY=AIzaSyDZWUEqfCe8ZA2jVulhioiNtgz1-yIGCL4
+GEMINI_API_KEY=YOUR_GEMINI_API_KEY_HERE
 ```
 
 2. Then access the app at `http://localhost:3001`

@@ -46,9 +46,9 @@ Railway 会自动：
 3. 点击 **"New Variable"** 添加：
 
    **变量名**: `GEMINI_API_KEY`  
-   **值**: `AIzaSyCuDjpraog5HXVhNTDi20_GvK8PZqxIvj8`
+   **值**: `YOUR_GEMINI_API_KEY_HERE`
 
-   （或您的实际 API 密钥）
+   （请使用您自己的 Gemini API 密钥）
 
 4. 点击 **"Add"** 保存
 

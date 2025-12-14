@@ -32,7 +32,7 @@ GEMINI_API_KEY
 
 **变量值**（不要加引号）：
 ```
-AIzaSyCuDjpraog5HXVhNTDi20_GvK8PZqxIvj8
+YOUR_GEMINI_API_KEY_HERE
 ```
 
 **检查**：
@@ -140,9 +140,9 @@ All env vars starting with GEMINI: []
 - ✅ `GEMINI_API_KEY`（正确）
 
 ### 错误 3: 值有引号或空格
-- ❌ `"AIzaSy..."`
-- ❌ ` AIzaSy... `（前后有空格）
-- ✅ `AIzaSy...`（正确）
+- ❌ `"YOUR_API_KEY"`（不要加引号）
+- ❌ ` YOUR_API_KEY `（前后有空格）
+- ✅ `YOUR_API_KEY`（正确）
 
 ### 错误 4: 没有重新部署
 - 添加环境变量后直接测试
@@ -159,7 +159,7 @@ Railway Dashboard
 └── Your Project
     └── Your Service (点击这里！)
         └── Variables (标签)
-            └── GEMINI_API_KEY = AIzaSy...
+            └── GEMINI_API_KEY = YOUR_GEMINI_API_KEY_HERE
 ```
 
 ### 重新部署位置：

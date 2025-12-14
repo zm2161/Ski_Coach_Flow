@@ -18,13 +18,13 @@
 **正确的格式**：
 ```
 变量名: GEMINI_API_KEY
-值: AIzaSyCuDjpraog5HXVhNTDi20_GvK8PZqxIvj8
+值: YOUR_GEMINI_API_KEY_HERE
 ```
 
 **错误的格式**（不要这样做）：
 ```
-值: "AIzaSyCuDjpraog5HXVhNTDi20_GvK8PZqxIvj8"  ❌ (不要加引号)
-值: AIzaSyCuDjpraog5HXVhNTDi20_GvK8PZqxIvj8   ✅ (正确)
+值: "YOUR_API_KEY"  ❌ (不要加引号)
+值: YOUR_API_KEY   ✅ (正确)
 ```
 
 ### 步骤 2: 重新部署服务
@@ -114,7 +114,7 @@ GEMINI_API_KEY length: 0
 
 ### 错误 1: 添加了引号
 ```
-值: "AIzaSy..."  ❌
+值: "YOUR_API_KEY"  ❌
 ```
 **修复**：删除引号，只保留 API key 本身
 

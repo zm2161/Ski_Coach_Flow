@@ -1,4 +1,5 @@
 // Quick test script to check which Gemini models are available
+require('dotenv').config();
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const API_KEY = process.env.GEMINI_API_KEY;
@@ -7,17 +8,18 @@ if (!API_KEY) {
   console.error('请在 .env 文件中设置 GEMINI_API_KEY，或通过环境变量传入');
   process.exit(1);
 }
+console.log('✅ API Key loaded (length:', API_KEY.length, ')');
 const genAI = new GoogleGenerativeAI(API_KEY);
 
 const modelsToTest = [
+  'gemini-2.5-flash',  // Current model used in server.js
+  'models/gemini-2.5-flash',  // With models/ prefix
   'gemini-1.5-flash',
   'gemini-1.5-pro',
-  'gemini-pro',
   'models/gemini-1.5-flash',
   'models/gemini-1.5-pro',
-  'models/gemini-pro',
-  'gemini-pro-001',
-  'gemini-1.5-flash-001'
+  'gemini-pro',
+  'models/gemini-pro'
 ];
 
 async function testModels() {
@@ -34,7 +36,15 @@ async function testModels() {
       console.log(`   Response: ${text.substring(0, 50)}...\n`);
       return modelName; // Return first working model
     } catch (error) {
-      console.log(`❌ ${modelName} - FAILED: ${error.message.substring(0, 80)}...\n`);
+      const errorMsg = error.message || error.toString();
+      console.log(`❌ ${modelName} - FAILED: ${errorMsg.substring(0, 100)}`);
+      // Show full error for debugging
+      if (errorMsg.includes('404') || errorMsg.includes('not found')) {
+        console.log(`   (Model not found - this is normal for unavailable models)`);
+      } else if (errorMsg.includes('API key') || errorMsg.includes('expired') || errorMsg.includes('invalid')) {
+        console.log(`   ⚠️  API key issue - check your key`);
+      }
+      console.log('');
     }
   }
   

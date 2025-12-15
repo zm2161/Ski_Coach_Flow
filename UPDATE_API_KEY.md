@@ -22,7 +22,7 @@
    - 点击 **"Variables"** 标签
    - 找到 `GEMINI_API_KEY`
    - 点击编辑（或删除后重新添加）
-   - 输入新 API key：`AIzaSyDk3NJAE8ADVL4b6hGQw4O2-auN9U_JCR4`
+   - 输入新 API key：`AIzaSyCuDjpraog5HXVhNTDi20_GvK8PZqxIvj8`
    - **不要加引号**
    - 点击 **"Save"** 或 **"Add"**
 

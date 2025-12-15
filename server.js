@@ -122,9 +122,9 @@ if (!geminiKey) {
   console.warn('[Gemini] ⚠️ No GEMINI_API_KEY set');
   console.warn('[Gemini] Please check Railway Variables and redeploy after adding the key');
 } else {
-  // Verify it's the new key (starts with AIzaSyCuDj)
-  const expectedStart = 'AIzaSyCuDj';
-  const expectedEnd = 'K8PZqxIvj8';
+  // Verify it's the new key (starts with AIzaSyDbNf)
+  const expectedStart = 'AIzaSyDbNf';
+  const expectedEnd = 'gXjHy-A';
   if (geminiKey.startsWith(expectedStart) && geminiKey.endsWith(expectedEnd)) {
     console.log('[Gemini] ✅ GEMINI_API_KEY loaded successfully (NEW KEY - matches expected fingerprint)');
   } else {

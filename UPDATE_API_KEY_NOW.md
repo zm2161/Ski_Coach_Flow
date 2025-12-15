@@ -2,7 +2,7 @@
 
 ## ✅ 新 API Key
 ```
-AIzaSyDk3NJAE8ADVL4b6hGQw4O2-auN9U_JCR4
+AIzaSyCuDjpraog5HXVhNTDi20_GvK8PZqxIvj8
 ```
 
 ## 📝 需要更新的地方
@@ -11,12 +11,12 @@ AIzaSyDk3NJAE8ADVL4b6hGQw4O2-auN9U_JCR4
 
 打开 `.env` 文件，更新为：
 ```
-GEMINI_API_KEY=AIzaSyDk3NJAE8ADVL4b6hGQw4O2-auN9U_JCR4
+GEMINI_API_KEY=AIzaSyCuDjpraog5HXVhNTDi20_GvK8PZqxIvj8
 ```
 
 **或者运行命令**：
 ```bash
-echo "GEMINI_API_KEY=AIzaSyDk3NJAE8ADVL4b6hGQw4O2-auN9U_JCR4" > .env
+echo "GEMINI_API_KEY=AIzaSyCuDjpraog5HXVhNTDi20_GvK8PZqxIvj8" > .env
 ```
 
 ### 2. Railway 环境变量（必须！）
@@ -29,7 +29,7 @@ echo "GEMINI_API_KEY=AIzaSyDk3NJAE8ADVL4b6hGQw4O2-auN9U_JCR4" > .env
    - 点击 **"Variables"** 标签
    - 找到 `GEMINI_API_KEY`
    - 点击编辑
-   - 更新值为：`AIzaSyDk3NJAE8ADVL4b6hGQw4O2-auN9U_JCR4`
+   - 更新值为：`AIzaSyCuDjpraog5HXVhNTDi20_GvK8PZqxIvj8`
    - **不要加引号**
    - 保存
 

@@ -6,7 +6,7 @@ const cors = require('cors');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const OpenAI = require('openai');
 // Railway deployment - FFmpeg is available
 const IS_VERCEL = !!process.env.VERCEL;
 let ffmpeg;
@@ -17,14 +17,15 @@ if (!IS_VERCEL) {
 }
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8000;
 
-// CORS configuration - allow Vercel frontend and Railway backend
+// CORS configuration - allow Vercel frontend, Railway backend, and AI Builder
 const allowedOrigins = [
   'https://traeskiingcoach8oba-naif6t401-jennys-projects-d204687a.vercel.app',
   /^https:\/\/.*\.vercel\.app$/,
   /^https:\/\/.*\.railway\.app$/,
   /^https:\/\/.*\.up\.railway\.app$/,
+  /^https:\/\/.*\.ai-builders\.space$/,
   'http://localhost:3000',
   'http://localhost:5173',
   'http://127.0.0.1:3000'
@@ -106,44 +107,32 @@ const upload = multer({
   }
 });
 
-// Initialize Gemini AI
-// Debug: Check GEMINI_API_KEY (only print fingerprint, not the actual key)
-const geminiKey = process.env.GEMINI_API_KEY;
+// Initialize AI Builder API client (uses OpenAI SDK compatible interface)
+// AI_BUILDER_TOKEN is automatically injected by AI Builder platform
+const aiBuilderToken = process.env.AI_BUILDER_TOKEN;
 console.log('='.repeat(60));
-console.log('🔑 GEMINI_API_KEY Fingerprint (for comparison):');
-console.log('   Length:', geminiKey?.length || 0);
-console.log('   First 10 chars:', geminiKey?.substring(0, 10) || 'NOT SET');
-console.log('   Last 10 chars:', geminiKey?.substring(geminiKey?.length - 10) || 'NOT SET');
-console.log('   Full fingerprint:', geminiKey ? `${geminiKey.substring(0, 10)}...${geminiKey.substring(geminiKey.length - 10)}` : 'NOT SET');
+console.log('🔑 AI Builder API Configuration:');
+console.log('   AI_BUILDER_TOKEN:', aiBuilderToken ? `Set (length: ${aiBuilderToken.length})` : 'NOT SET');
+console.log('   API Base URL: https://space.ai-builders.com/backend/v1');
+console.log('   Model: gemini-2.5-pro (via AI Builder MCP)');
 console.log('='.repeat(60));
-console.log('All env vars starting with GEMINI:', Object.keys(process.env).filter(k => k.startsWith('GEMINI')));
 
-if (!geminiKey) {
-  console.warn('[Gemini] ⚠️ No GEMINI_API_KEY set');
-  console.warn('[Gemini] Please check Railway Variables and redeploy after adding the key');
-} else {
-  // Verify it's the new key (starts with AIzaSyDbNf)
-  const expectedStart = 'AIzaSyDbNf';
-  const expectedEnd = 'gXjHy-A';
-  if (geminiKey.startsWith(expectedStart) && geminiKey.endsWith(expectedEnd)) {
-    console.log('[Gemini] ✅ GEMINI_API_KEY loaded successfully (NEW KEY - matches expected fingerprint)');
-  } else {
-    console.warn('[Gemini] ⚠️ GEMINI_API_KEY loaded but fingerprint does not match expected');
-    console.warn('[Gemini] Expected fingerprint:', `${expectedStart}...${expectedEnd}`);
-    console.warn('[Gemini] Actual fingerprint:', `${geminiKey.substring(0, 10)}...${geminiKey.substring(geminiKey.length - 10)}`);
-    console.warn('[Gemini] Please update Railway Variables with new API key and redeploy');
-  }
+if (!aiBuilderToken) {
+  console.warn('[AI Builder] ⚠️ No AI_BUILDER_TOKEN set');
+  console.warn('[AI Builder] This will be automatically injected by AI Builder platform during deployment');
+  console.warn('[AI Builder] For local testing, set AI_BUILDER_TOKEN in .env file');
 }
-const genAI = new GoogleGenerativeAI(geminiKey || '');
 
-// Helper function to list available models (for debugging)
-async function listAvailableModels() {
-  try {
-    // Note: The SDK doesn't have a direct listModels method, but we can try different model names
-    console.log('[Gemini] Available model names to try: gemini-1.5-flash, gemini-1.5-pro, gemini-pro, models/gemini-1.5-flash, models/gemini-pro');
-  } catch (error) {
-    console.error('[Gemini] Could not list models:', error);
-  }
+// Initialize OpenAI client configured for AI Builder API
+let openai = null;
+if (aiBuilderToken) {
+  openai = new OpenAI({
+    baseURL: 'https://space.ai-builders.com/backend/v1',
+    apiKey: aiBuilderToken,
+  });
+  console.log('[AI Builder] ✅ OpenAI client initialized successfully');
+} else {
+  console.warn('[AI Builder] ⚠️ OpenAI client not initialized - AI_BUILDER_TOKEN not set');
 }
 
 // Store video metadata and scenes
@@ -319,14 +308,13 @@ function segmentVideo(duration, numSegments = 5) {
   return segmentVideoUniform(duration, 30); // Use 30 fps as default
 }
 
-// Generate coaching analysis using Gemini
+// Generate coaching analysis using AI Builder MCP API
 async function generateCoachingAnalysis(scenes, sport, videoPath, fps = 30, terrain = 'blue') {
-  console.log(`[Gemini] Starting analysis for ${sport}, terrain: ${terrain}, ${scenes.length} scenes, FPS: ${fps}`);
+  console.log(`[AI Builder] Starting analysis for ${sport}, terrain: ${terrain}, ${scenes.length} scenes, FPS: ${fps}`);
   
-  // Use Gemini 2.5 Flash - confirmed available with this API key
-  const modelName = 'models/gemini-2.5-flash';
-  const textModel = genAI.getGenerativeModel({ model: modelName });
-  console.log(`[Gemini] Using model: ${modelName}`);
+  // Use Gemini 2.5 Pro via AI Builder MCP API
+  const modelName = 'gemini-2.5-pro';
+  console.log(`[AI Builder] Using model: ${modelName} (via MCP API)`);
   
   const framework = sport === 'ski' ? 'CSIA' : 'CASI';
   const frameworkConcepts = sport === 'ski' 
@@ -421,25 +409,79 @@ ${JSON.stringify(scenesWithFrames, null, 2)}
 根据${currentTerrain.name}（${currentTerrain.level}）的特点，评估滑手水平并给出适合该地形和水平的建议。`;
 
   try {
-    console.log('[Gemini] Sending request to Gemini 2.5 Flash...');
-    console.log('[Gemini] Prompt length:', prompt.length, 'characters');
+    console.log('[AI Builder] Sending request to Gemini 2.5 Pro via AI Builder API...');
+    console.log('[AI Builder] Prompt length:', prompt.length, 'characters');
     
-    const result = await textModel.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text();
+    // Check if API client is initialized
+    if (!openai) {
+      throw new Error('AI Builder API client not initialized. Please check AI_BUILDER_TOKEN.');
+    }
     
-    console.log('[Gemini] ✅ Received response from API (length:', text.length, 'chars)');
-    console.log('[Gemini] Response preview (first 500 chars):');
+    // Use OpenAI SDK to call AI Builder API (which routes to Gemini)
+    // Note: AI Builder API uses OpenAI-compatible format
+    const completion = await openai.chat.completions.create({
+      model: 'gemini-2.5-pro',
+      messages: [
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      temperature: 0.7,
+      max_tokens: 4096,
+    }).catch(error => {
+      // Enhanced error logging for OpenAI SDK errors
+      console.error('[AI Builder] API Request failed:');
+      console.error('[AI Builder] Error Type:', error.constructor.name);
+      console.error('[AI Builder] Error Message:', error.message);
+      
+      // OpenAI SDK error structure
+      if (error.status) {
+        console.error('[AI Builder] HTTP Status:', error.status);
+      }
+      if (error.statusCode) {
+        console.error('[AI Builder] Status Code:', error.statusCode);
+      }
+      if (error.code) {
+        console.error('[AI Builder] Error Code:', error.code);
+      }
+      
+      // Check for response data
+      if (error.response) {
+        console.error('[AI Builder] Response Status:', error.response.status);
+        if (error.response.data) {
+          console.error('[AI Builder] Response Data:', JSON.stringify(error.response.data, null, 2));
+        }
+      }
+      
+      // Check for error.error (OpenAI SDK format)
+      if (error.error) {
+        console.error('[AI Builder] Error Details:', JSON.stringify(error.error, null, 2));
+      }
+      
+      // Log request details for debugging
+      console.error('[AI Builder] Request URL:', 'https://space.ai-builders.com/backend/v1/chat/completions');
+      console.error('[AI Builder] Model:', 'gemini-2.5-pro');
+      console.error('[AI Builder] Token Present:', !!aiBuilderToken);
+      console.error('[AI Builder] Token Length:', aiBuilderToken ? aiBuilderToken.length : 0);
+      
+      throw error;
+    });
+    
+    const text = completion.choices[0]?.message?.content || '';
+    
+    console.log('[AI Builder] ✅ Received response from API (length:', text.length, 'chars)');
+    console.log('[AI Builder] Response preview (first 500 chars):');
     console.log(text.substring(0, 500));
     
     // Extract JSON from the response (it might have markdown code blocks)
     let jsonText = text.trim();
     if (jsonText.includes('```json')) {
       jsonText = jsonText.split('```json')[1].split('```')[0].trim();
-      console.log('[Gemini] Extracted JSON from markdown code block');
+      console.log('[AI Builder] Extracted JSON from markdown code block');
     } else if (jsonText.includes('```')) {
       jsonText = jsonText.split('```')[1].split('```')[0].trim();
-      console.log('[Gemini] Extracted JSON from code block');
+      console.log('[AI Builder] Extracted JSON from code block');
     }
     
     // Try to find JSON object if it's embedded in text
@@ -449,40 +491,74 @@ ${JSON.stringify(scenesWithFrames, null, 2)}
     }
     
     const coachingData = JSON.parse(jsonText);
-    console.log('[Gemini] ✅ Successfully parsed JSON, returned', coachingData.scenes?.length || 0, 'scenes');
+    console.log('[AI Builder] ✅ Successfully parsed JSON, returned', coachingData.scenes?.length || 0, 'scenes');
     
     // Validate the response structure
     if (!coachingData.scenes || !Array.isArray(coachingData.scenes)) {
-      throw new Error('Invalid response structure from Gemini API - missing scenes array');
+      throw new Error('Invalid response structure from AI Builder API - missing scenes array');
     }
     
     // Validate each scene has required fields
     coachingData.scenes.forEach((scene, idx) => {
       if (!scene.coaching_text || scene.coaching_text.length < 20) {
-        console.warn(`[Gemini] Warning: Scene ${idx + 1} has very short coaching_text (${scene.coaching_text?.length || 0} chars)`);
+        console.warn(`[AI Builder] Warning: Scene ${idx + 1} has very short coaching_text (${scene.coaching_text?.length || 0} chars)`);
       }
     });
     
-    console.log('[Gemini] ✅ Validation complete, returning coaching data');
+    console.log('[AI Builder] ✅ Validation complete, returning coaching data');
     return coachingData;
   } catch (error) {
-    console.error('[Gemini] ❌ ERROR generating coaching analysis:');
-    console.error('[Gemini] Error message:', error.message);
-    console.error('[Gemini] Error name:', error.name);
+    console.error('[AI Builder] ❌ ERROR generating coaching analysis:');
+    console.error('[AI Builder] Error Type:', error.constructor.name);
+    console.error('[AI Builder] Error message:', error.message);
+    console.error('[AI Builder] Error name:', error.name);
+    
+    // Log detailed error information (OpenAI SDK error format)
+    const statusCode = error.status || error.statusCode || (error.response && error.response.status);
+    if (statusCode) {
+      console.error('[AI Builder] HTTP Status Code:', statusCode);
+    }
+    if (error.response) {
+      console.error('[AI Builder] Response Status:', error.response.status);
+      if (error.response.data) {
+        console.error('[AI Builder] Response Data:', JSON.stringify(error.response.data, null, 2));
+      }
+    }
+    // OpenAI SDK may have error.error
+    if (error.error) {
+      console.error('[AI Builder] Error Details:', JSON.stringify(error.error, null, 2));
+    }
+    if (error.code) {
+      console.error('[AI Builder] Error Code:', error.code);
+    }
     if (error.stack) {
-      console.error('[Gemini] Error stack:', error.stack);
+      console.error('[AI Builder] Error stack:', error.stack);
+    }
+    
+    // Log API configuration for debugging
+    console.error('[AI Builder] API Configuration:');
+    console.error('[AI Builder]   Base URL: https://space.ai-builders.com/backend/v1');
+    console.error('[AI Builder]   Model: gemini-2.5-pro');
+    console.error('[AI Builder]   Token Set:', !!aiBuilderToken);
+    console.error('[AI Builder]   Token Length:', aiBuilderToken ? aiBuilderToken.length : 0);
+    
+    // Provide more helpful error messages
+    let errorMessage = error.message || 'Unknown error';
+    if (statusCode === 500 || error.message.includes('500')) {
+      errorMessage = 'AI Builder API 服务器错误 (500)。可能是请求格式问题、模型不可用或服务暂时不可用。请检查 API 日志获取详细信息。';
+    } else if (statusCode === 401 || error.message.includes('401') || error.message.includes('Unauthorized')) {
+      errorMessage = 'AI Builder API 认证失败。请检查 AI_BUILDER_TOKEN 是否正确。';
+    } else if (statusCode === 400 || error.message.includes('400')) {
+      errorMessage = `AI Builder API 请求错误 (400): ${error.message}`;
     }
     
     // Re-throw the error with helpful message
-    throw new Error(`Gemini 2.5 Flash API错误: ${error.message}。请检查您的API密钥，确保它可以访问Gemini模型。`);
+    throw new Error(`AI Builder API错误: ${errorMessage}`);
   }
 }
 
 // Generate practice recommendations based on coaching analysis
 async function generatePracticeRecommendations(sport, coachingData) {
-  const modelName = 'models/gemini-2.5-flash';
-  const textModel = genAI.getGenerativeModel({ model: modelName });
-  
   const framework = sport === 'ski' ? 'CSIA' : 'CASI';
   const sportName = sport === 'ski' ? '滑雪' : '单板滑雪';
   
@@ -542,10 +618,22 @@ ${JSON.stringify(coachingSummary, null, 2)}
 请根据上述教练反馈中识别出的具体技术问题，推荐最相关的练习。所有文字使用简体中文。`;
 
   try {
-    console.log('[Practice] Generating practice recommendations...');
-    const result = await textModel.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text();
+    console.log('[AI Builder] Generating practice recommendations via AI Builder API...');
+    
+    // Use OpenAI SDK to call AI Builder API (which routes to Gemini)
+    const completion = await openai.chat.completions.create({
+      model: 'gemini-2.5-pro',
+      messages: [
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      temperature: 0.7,
+      max_tokens: 2048,
+    });
+    
+    const text = completion.choices[0]?.message?.content || '';
     
     // Extract JSON from response
     let jsonText = text.trim();
@@ -561,10 +649,10 @@ ${JSON.stringify(coachingSummary, null, 2)}
     }
     
     const practiceData = JSON.parse(jsonText);
-    console.log('[Practice] ✅ Generated', practiceData.recommendations?.length || 0, 'practice recommendations');
+    console.log('[AI Builder] ✅ Generated', practiceData.recommendations?.length || 0, 'practice recommendations');
     return practiceData.recommendations || [];
   } catch (error) {
-    console.error('[Practice] ❌ Error generating recommendations:', error);
+    console.error('[AI Builder] ❌ Error generating recommendations:', error);
     // Return default recommendations based on sport
     return getDefaultRecommendations(sport);
   }
@@ -726,11 +814,11 @@ app.post('/api/upload', upload.single('video'), async (req, res) => {
       return res.status(400).json({ error: error.message || '文件上传失败' });
     }
     
-    // If it's a Gemini API error, provide helpful message
-    if (error.message.includes('Gemini API error')) {
+    // If it's an AI Builder API error, provide helpful message
+    if (error.message.includes('AI Builder API error') || error.message.includes('API error')) {
       res.status(500).json({ 
         error: error.message,
-        details: 'AI分析服务无响应。请检查您的API密钥或稍后重试。'
+        details: 'AI分析服务无响应。请检查AI_BUILDER_TOKEN配置或稍后重试。'
       });
     } else {
       res.status(500).json({ error: error.message || '上传过程中发生错误' });
@@ -769,12 +857,13 @@ app.get('/api/video/:videoId/coaching', (req, res) => {
   res.json(data.coaching);
 });
 
-// Start server (Railway or local development)
-// Railway will set PORT automatically, local dev uses 3000
+// Start server (Railway, AI Builder, or local development)
+// Railway/AI Builder will set PORT automatically, local dev uses 8000
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📡 CORS enabled for Vercel frontend`);
   console.log(`🎬 FFmpeg available: ${!IS_VERCEL ? 'Yes' : 'No (Vercel)'}`);
+  console.log(`🌐 Access at: http://0.0.0.0:${PORT}`);
 });
 
 // Export for Vercel serverless (if needed)

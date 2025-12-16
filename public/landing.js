@@ -363,7 +363,13 @@ document.addEventListener('DOMContentLoaded', () => {
                             }
                         } else {
                             console.error('[Upload] 上传失败，状态码:', xhr.status, '响应:', xhr.responseText);
-                            reject(new Error(`上传失败（状态码 ${xhr.status}）: ${xhr.responseText.substring(0, 100)}`));
+                            // Handle 413 error specifically
+                            if (xhr.status === 413) {
+                                const errorMsg = '文件太大（413错误）。nginx 反向代理限制了文件大小。\n\n请使用小于 20MB 的视频文件。\n提示：可以压缩视频或使用更短的视频片段。';
+                                reject(new Error(errorMsg));
+                            } else {
+                                reject(new Error(`上传失败（状态码 ${xhr.status}）: ${xhr.responseText.substring(0, 100)}`));
+                            }
                         }
                     });
                     

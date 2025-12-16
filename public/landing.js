@@ -476,25 +476,7 @@ document.addEventListener('DOMContentLoaded', () => {
             xhr.open('POST', uploadUrl);
             xhr.send(formData);
         });
-            
-            // Should not reach here if API_BASE is set
-            const urlParamCheck = new URLSearchParams(window.location.search).get('apiBase');
-            if (urlParamCheck) {
-                console.error('[Upload] ❌ 严重错误：URL参数中有apiBase但代码走到了fallback路径！');
-                console.error('[Upload] 这不应该发生，请检查getApiBase()函数');
-                alert(`配置错误：检测到apiBase参数但未使用！\n\nURL参数: ${urlParamCheck}\n\n请刷新页面重试，或检查浏览器控制台。`);
-                throw new Error('API_BASE配置错误：URL参数存在但未使用');
-            }
-            
-            // No API_BASE and no localhost - cannot upload
-            console.error('[Upload] ❌ 错误：未检测到API_BASE，无法上传');
-            throw new Error('未配置后端地址。请在URL中添加 apiBase 参数，例如:\n?apiBase=https://your-localtunnel-url.loca.lt');
-        } catch (error) {
-            console.error('Upload error:', error);
-            alert(`上传失败：${error?.message || '请重试。'}`);
-            uploadProgress.style.display = 'none';
-            uploadBtn.disabled = false;
-        }
+    }
     });
 
     function getVideoDuration(file) {

@@ -219,12 +219,19 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Validate file size (20MB - limited by nginx on AI Builder platform)
-        const maxSize = 20 * 1024 * 1024; // 20MB
-        if (file.size > maxSize) {
+        // Note: nginx limit is 1MB, so we'll use chunked upload for files > 500KB
+        // This allows us to upload larger files by splitting them into smaller chunks
+        const chunkSize = 500 * 1024; // 500KB per chunk (under nginx 1MB limit)
+        const useChunkedUpload = file.size > chunkSize;
+        
+        if (file.size > 100 * 1024 * 1024) { // 100MB absolute max
             const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
-            alert(`文件大小必须小于 20MB。\n当前文件大小: ${sizeMB}MB\n\n提示: 请压缩视频或使用更短的视频片段。`);
+            alert(`文件太大（${sizeMB}MB）。\n最大支持: 100MB\n\n提示: 请压缩视频或使用更短的视频片段。`);
             return;
+        }
+        
+        if (useChunkedUpload) {
+            console.log(`[Upload] 文件大小 ${(file.size / 1024 / 1024).toFixed(2)}MB，将使用分块上传`);
         }
 
         selectedFile = file;
@@ -245,13 +252,6 @@ document.addEventListener('DOMContentLoaded', () => {
         // Get video duration
         const duration = await getVideoDuration(selectedFile);
         
-        // Upload file
-        const formData = new FormData();
-        formData.append('video', selectedFile);
-        formData.append('sport', selectedSport);
-        formData.append('terrain', selectedTerrain);
-        formData.append('duration', duration.toString());
-
         uploadProgress.style.display = 'block';
         uploadBtn.disabled = true;
 
@@ -274,139 +274,208 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error('API_BASE解析失败');
             }
             
-            // Use relative path for Railway (same domain) or absolute path for external backend
-            const uploadUrl = currentApiBase ? `${currentApiBase}/api/upload` : '/api/upload';
-            const isRailway = window.location.hostname.includes('railway.app') || 
-                              window.location.hostname.includes('up.railway.app');
+            // Check if we need chunked upload (nginx limit is 1MB)
+            const chunkSize = 500 * 1024; // 500KB per chunk (safe under 1MB nginx limit)
+            const useChunkedUpload = selectedFile.size > chunkSize;
             
-            if (useLocalBackend || !currentApiBase) {
-                console.log(`[Upload] ✅ 使用后端: ${uploadUrl}${isRailway ? ' (Railway 同域)' : ''}`);
-                
-                // Show initial progress
-                progressFill.style.width = '1%';
-                progressText.textContent = '连接中...';
-                
-                // Show progress for ngrok upload
-                const xhr = new XMLHttpRequest();
-                let uploadStarted = false;
-                let lastProgress = 0;
-                
-                // Add timeout (5 minutes for large files)
-                const timeout = setTimeout(() => {
-                    if (!uploadStarted) {
-                        console.error('[Upload] 连接超时');
-                        xhr.abort();
-                        reject(new Error('连接超时，请检查网络和ngrok连接'));
-                    }
-                }, 10000); // 10秒连接超时
-                
-                xhr.upload.addEventListener('loadstart', () => {
-                    uploadStarted = true;
-                    clearTimeout(timeout);
-                    console.log('[Upload] 开始上传...');
-                    progressText.textContent = '上传中... 0%';
-                });
-                
-                xhr.upload.addEventListener('progress', (e) => {
-                    if (e.lengthComputable && e.total > 0) {
-                        const percentComplete = (e.loaded / e.total) * 100;
-                        lastProgress = percentComplete;
-                        progressFill.style.width = percentComplete + '%';
-                        progressText.textContent = `上传中... ${Math.round(percentComplete)}%`;
-                        console.log(`[Upload] 进度: ${Math.round(percentComplete)}% (${(e.loaded / 1024 / 1024).toFixed(2)}MB / ${(e.total / 1024 / 1024).toFixed(2)}MB)`);
-                    } else {
-                        // If not computable, show indeterminate progress
-                        progressText.textContent = '上传中...';
-                    }
-                });
-                
-                xhr.upload.addEventListener('load', () => {
-                    console.log('[Upload] 文件上传完成，等待服务器处理...');
-                    progressText.textContent = '处理中...';
-                });
-                
-                return new Promise((resolve, reject) => {
-                    xhr.addEventListener('load', () => {
-                        clearTimeout(timeout);
-                        if (xhr.status === 200) {
-                            try {
-                                const response = JSON.parse(xhr.responseText);
-                                console.log('[Upload] 上传成功:', response);
-                                progressText.textContent = '完成！';
-                                progressFill.style.width = '100%';
-                                
-                                // Build video URL - use relative path if on Railway
-                                const videoUrl = currentApiBase 
-                                    ? `${currentApiBase}${response.url}`
-                                    : response.url;
-                                
-                                sessionStorage.setItem('videoData', JSON.stringify({
-                                    videoId: response.videoId,
-                                    url: videoUrl,
-                                    duration: response.duration,
-                                    fps: response.fps || 30,
-                                    coaching: response.coaching,
-                                    practiceRecommendations: response.practiceRecommendations || [],
-                                    sport: selectedSport,
-                                    terrain: selectedTerrain,
-                                    apiBase: currentApiBase || ''
-                                }));
-                                
-                                // Small delay to show completion
-                                setTimeout(() => {
-                                    window.location.href = 'analyze.html';
-                                }, 500);
-                                resolve();
-                            } catch (e) {
-                                console.error('[Upload] JSON解析错误:', e, '响应:', xhr.responseText);
-                                reject(new Error('响应解析失败'));
-                            }
-                        } else {
-                            console.error('[Upload] 上传失败，状态码:', xhr.status, '响应:', xhr.responseText);
-                            // Handle 413 error specifically
-                            if (xhr.status === 413) {
-                                const errorMsg = '文件太大（413错误）。nginx 反向代理限制了文件大小。\n\n请使用小于 20MB 的视频文件。\n提示：可以压缩视频或使用更短的视频片段。';
-                                reject(new Error(errorMsg));
-                            } else {
-                                reject(new Error(`上传失败（状态码 ${xhr.status}）: ${xhr.responseText.substring(0, 100)}`));
-                            }
-                        }
-                    });
-                    
-                    xhr.addEventListener('error', (e) => {
-                        clearTimeout(timeout);
-                        console.error('[Upload] 网络错误:', e);
-                        progressText.textContent = '网络错误';
-                        const errorMsg = isRailway 
-                            ? '网络错误，请检查服务器连接'
-                            : '网络错误，请检查连接';
-                        reject(new Error(errorMsg));
-                    });
-                    
-                    xhr.addEventListener('abort', () => {
-                        clearTimeout(timeout);
-                        console.error('[Upload] 请求被中止');
-                        progressText.textContent = '已取消';
-                        reject(new Error('上传被取消或超时'));
-                    });
-                    
-                    xhr.addEventListener('timeout', () => {
-                        clearTimeout(timeout);
-                        console.error('[Upload] 请求超时');
-                        progressText.textContent = '超时';
-                        reject(new Error('上传超时，请检查网络连接'));
-                    });
-                    
-                    // Set timeout for the entire request (10 minutes)
-                    xhr.timeout = 600000;
-                    
-                    xhr.open('POST', uploadUrl);
-                    console.log('[Upload] 发送请求到:', uploadUrl);
-                    console.log('[Upload] 文件大小:', (selectedFile.size / 1024 / 1024).toFixed(2), 'MB');
-                    
-                    xhr.send(formData);
-                });
+            if (useChunkedUpload) {
+                console.log(`[Upload] 文件大小 ${(selectedFile.size / 1024 / 1024).toFixed(2)}MB，使用分块上传`);
+                await uploadFileInChunks(selectedFile, selectedSport, selectedTerrain, duration, currentApiBase);
+            } else {
+                console.log(`[Upload] 文件大小 ${(selectedFile.size / 1024 / 1024).toFixed(2)}MB，使用普通上传`);
+                await uploadFileDirect(selectedFile, selectedSport, selectedTerrain, duration, currentApiBase);
             }
+        } catch (error) {
+            console.error('[Upload] 上传失败:', error);
+            alert(error.message || '上传失败，请重试');
+            uploadProgress.style.display = 'none';
+            uploadBtn.disabled = false;
+        }
+    });
+    
+    // Chunked upload function
+    async function uploadFileInChunks(file, sport, terrain, duration, apiBase) {
+        const chunkSize = 500 * 1024; // 500KB per chunk
+        const totalChunks = Math.ceil(file.size / chunkSize);
+        const uploadId = Date.now().toString();
+        const fileName = file.name;
+        
+        const chunkUrl = apiBase ? `${apiBase}/api/upload-chunk` : '/api/upload-chunk';
+        const mergeUrl = apiBase ? `${apiBase}/api/merge-chunks` : '/api/merge-chunks';
+        
+        console.log(`[Chunk Upload] 开始分块上传: ${totalChunks} 块, 每块 ${(chunkSize / 1024).toFixed(0)}KB`);
+        
+        // Upload chunks
+        for (let i = 0; i < totalChunks; i++) {
+            const start = i * chunkSize;
+            const end = Math.min(start + chunkSize, file.size);
+            const chunk = file.slice(start, end);
+            
+            const formData = new FormData();
+            formData.append('chunk', chunk);
+            formData.append('chunkIndex', i.toString());
+            formData.append('totalChunks', totalChunks.toString());
+            formData.append('fileName', fileName);
+            formData.append('uploadId', uploadId);
+            
+            const chunkProgress = ((i + 1) / totalChunks) * 90; // 90% for upload, 10% for merge
+            progressFill.style.width = chunkProgress + '%';
+            progressText.textContent = `上传中... ${Math.round(chunkProgress)}% (块 ${i + 1}/${totalChunks})`;
+            
+            await new Promise((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', chunkUrl);
+                xhr.onload = () => {
+                    if (xhr.status === 200) {
+                        console.log(`[Chunk Upload] 块 ${i + 1}/${totalChunks} 上传成功`);
+                        resolve();
+                    } else {
+                        reject(new Error(`块 ${i + 1} 上传失败: ${xhr.status}`));
+                    }
+                };
+                xhr.onerror = () => reject(new Error(`块 ${i + 1} 上传网络错误`));
+                xhr.send(formData);
+            });
+        }
+        
+        // Merge chunks
+        progressText.textContent = '合并文件块...';
+        progressFill.style.width = '95%';
+        
+        const mergeResponse = await fetch(mergeUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                uploadId: uploadId,
+                fileName: fileName,
+                sport: sport,
+                terrain: terrain,
+                duration: duration
+            })
+        });
+        
+        if (!mergeResponse.ok) {
+            throw new Error(`合并失败: ${mergeResponse.status}`);
+        }
+        
+        const response = await mergeResponse.json();
+        console.log('[Chunk Upload] 合并成功:', response);
+        
+        progressText.textContent = '完成！';
+        progressFill.style.width = '100%';
+        
+        // Build video URL
+        const videoUrl = apiBase ? `${apiBase}${response.url}` : response.url;
+        
+        sessionStorage.setItem('videoData', JSON.stringify({
+            videoId: response.videoId,
+            url: videoUrl,
+            duration: response.duration,
+            fps: response.fps || 30,
+            coaching: response.coaching,
+            practiceRecommendations: response.practiceRecommendations || [],
+            sport: selectedSport,
+            terrain: selectedTerrain,
+            apiBase: apiBase || ''
+        }));
+        
+        setTimeout(() => {
+            window.location.href = 'analyze.html';
+        }, 500);
+    }
+    
+    // Direct upload function (for small files)
+    async function uploadFileDirect(file, sport, terrain, duration, apiBase) {
+        const uploadUrl = apiBase ? `${apiBase}/api/upload` : '/api/upload';
+        const isRailway = window.location.hostname.includes('railway.app') || 
+                          window.location.hostname.includes('up.railway.app');
+        
+        console.log(`[Upload] ✅ 使用后端: ${uploadUrl}${isRailway ? ' (Railway 同域)' : ''}`);
+        
+        const formData = new FormData();
+        formData.append('video', file);
+        formData.append('sport', sport);
+        formData.append('terrain', terrain);
+        formData.append('duration', duration.toString());
+        
+        progressFill.style.width = '1%';
+        progressText.textContent = '连接中...';
+        
+        return new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            let uploadStarted = false;
+            const timeout = setTimeout(() => {
+                if (!uploadStarted) {
+                    xhr.abort();
+                    reject(new Error('连接超时'));
+                }
+            }, 10000);
+            
+            xhr.upload.addEventListener('loadstart', () => {
+                uploadStarted = true;
+                clearTimeout(timeout);
+                progressText.textContent = '上传中... 0%';
+            });
+            
+            xhr.upload.addEventListener('progress', (e) => {
+                if (e.lengthComputable && e.total > 0) {
+                    const percentComplete = (e.loaded / e.total) * 100;
+                    progressFill.style.width = percentComplete + '%';
+                    progressText.textContent = `上传中... ${Math.round(percentComplete)}%`;
+                }
+            });
+            
+            xhr.upload.addEventListener('load', () => {
+                progressText.textContent = '处理中...';
+            });
+            
+            xhr.addEventListener('load', () => {
+                clearTimeout(timeout);
+                if (xhr.status === 200) {
+                    try {
+                        const response = JSON.parse(xhr.responseText);
+                        progressText.textContent = '完成！';
+                        progressFill.style.width = '100%';
+                        
+                        const videoUrl = apiBase ? `${apiBase}${response.url}` : response.url;
+                        
+                        sessionStorage.setItem('videoData', JSON.stringify({
+                            videoId: response.videoId,
+                            url: videoUrl,
+                            duration: response.duration,
+                            fps: response.fps || 30,
+                            coaching: response.coaching,
+                            practiceRecommendations: response.practiceRecommendations || [],
+                            sport: selectedSport,
+                            terrain: selectedTerrain,
+                            apiBase: apiBase || ''
+                        }));
+                        
+                        setTimeout(() => {
+                            window.location.href = 'analyze.html';
+                        }, 500);
+                        resolve();
+                    } catch (e) {
+                        reject(new Error('响应解析失败'));
+                    }
+                } else {
+                    if (xhr.status === 413) {
+                        reject(new Error('文件太大（413错误）。将自动使用分块上传重试。'));
+                    } else {
+                        reject(new Error(`上传失败（状态码 ${xhr.status}）`));
+                    }
+                }
+            });
+            
+            xhr.addEventListener('error', () => {
+                clearTimeout(timeout);
+                reject(new Error('网络错误'));
+            });
+            
+            xhr.timeout = 600000;
+            xhr.open('POST', uploadUrl);
+            xhr.send(formData);
+        });
             
             // Should not reach here if API_BASE is set
             const urlParamCheck = new URLSearchParams(window.location.search).get('apiBase');

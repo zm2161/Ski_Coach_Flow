@@ -745,6 +745,144 @@ app.post('/api/analyze', async (req, res) => {
 app.options('/api/upload', (req, res) => {
   res.sendStatus(204); // 预检直接 204 + CORS 头（由 cors 中间件自动加）
 });
+app.options('/api/upload-chunk', (req, res) => {
+  res.sendStatus(204);
+});
+app.options('/api/merge-chunks', (req, res) => {
+  res.sendStatus(204);
+});
+
+// Chunked upload endpoint - for files larger than nginx limit (1MB)
+// Each chunk must be < 1MB to pass through nginx
+app.post('/api/upload-chunk', upload.single('chunk'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: '未提供文件块' });
+    }
+
+    const chunkIndex = parseInt(req.body.chunkIndex) || 0;
+    const totalChunks = parseInt(req.body.totalChunks) || 1;
+    const fileName = req.body.fileName || `upload-${Date.now()}`;
+    const uploadId = req.body.uploadId || Date.now().toString();
+
+    // Store chunk in temporary directory
+    const chunkDir = path.join(__dirname, 'uploads', 'chunks', uploadId);
+    if (!fs.existsSync(chunkDir)) {
+      fs.mkdirSync(chunkDir, { recursive: true });
+    }
+
+    const chunkPath = path.join(chunkDir, `chunk-${chunkIndex}`);
+    fs.renameSync(req.file.path, chunkPath);
+
+    console.log(`[Chunk Upload] Received chunk ${chunkIndex + 1}/${totalChunks} for ${fileName} (${(req.file.size / 1024).toFixed(2)}KB)`);
+
+    res.json({
+      success: true,
+      chunkIndex,
+      totalChunks,
+      message: `块 ${chunkIndex + 1}/${totalChunks} 上传成功`
+    });
+  } catch (error) {
+    console.error('[Chunk Upload] Error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Endpoint to merge chunks and process video
+app.post('/api/merge-chunks', express.json({ limit: '10mb' }), async (req, res) => {
+  try {
+    const { uploadId, fileName, sport, terrain, duration } = req.body;
+
+    if (!uploadId || !fileName) {
+      return res.status(400).json({ error: '缺少必要参数' });
+    }
+
+    const chunkDir = path.join(__dirname, 'uploads', 'chunks', uploadId);
+    if (!fs.existsSync(chunkDir)) {
+      return res.status(404).json({ error: '未找到上传块' });
+    }
+
+    // Get all chunk files
+    const chunkFiles = fs.readdirSync(chunkDir)
+      .filter(f => f.startsWith('chunk-'))
+      .sort((a, b) => {
+        const aIndex = parseInt(a.split('-')[1]);
+        const bIndex = parseInt(b.split('-')[1]);
+        return aIndex - bIndex;
+      });
+
+    if (chunkFiles.length === 0) {
+      return res.status(400).json({ error: '没有找到文件块' });
+    }
+
+    console.log(`[Chunk Merge] Merging ${chunkFiles.length} chunks for ${fileName}`);
+
+    // Merge chunks
+    const finalFileName = `video-${Date.now()}-${Math.round(Math.random() * 1E9)}${path.extname(fileName)}`;
+    const finalPath = path.join(__dirname, 'uploads', finalFileName);
+    const writeStream = fs.createWriteStream(finalPath);
+
+    for (let i = 0; i < chunkFiles.length; i++) {
+      const chunkPath = path.join(chunkDir, chunkFiles[i]);
+      const chunkData = fs.readFileSync(chunkPath);
+      writeStream.write(chunkData);
+      fs.unlinkSync(chunkPath); // Delete chunk after merging
+    }
+
+    writeStream.end();
+
+    await new Promise((resolve, reject) => {
+      writeStream.on('finish', resolve);
+      writeStream.on('error', reject);
+    });
+
+    // Clean up chunk directory
+    try {
+      fs.rmdirSync(chunkDir);
+    } catch (e) {
+      // Ignore if directory not empty
+    }
+
+    console.log(`[Chunk Merge] File merged: ${finalPath}`);
+
+    // Now process the video (same as regular upload)
+    const videoMetadata = await getVideoMetadata(finalPath);
+    const scenes = await segmentVideoWithMotion(finalPath, videoMetadata.duration, videoMetadata.fps);
+    const coachingData = await generateCoachingAnalysis(scenes, sport || 'ski', finalPath, videoMetadata.fps, terrain || 'blue');
+    const practiceRecommendations = await generatePracticeRecommendations(sport || 'ski', coachingData);
+
+    const videoId = Date.now().toString();
+    const videoUrl = `/uploads/${finalFileName}`;
+
+    videoData.set(videoId, {
+      id: videoId,
+      filename: finalFileName,
+      path: finalPath,
+      url: videoUrl,
+      sport: sport || 'ski',
+      terrain: terrain || 'blue',
+      duration: videoMetadata.duration,
+      fps: videoMetadata.fps,
+      scenes: scenes,
+      coaching: coachingData,
+      practiceRecommendations: practiceRecommendations
+    });
+
+    res.json({
+      videoId: videoId,
+      url: videoUrl,
+      duration: videoMetadata.duration,
+      fps: videoMetadata.fps,
+      coaching: coachingData,
+      practiceRecommendations: practiceRecommendations,
+      sport: sport || 'ski',
+      terrain: terrain || 'blue'
+    });
+  } catch (error) {
+    console.error('[Chunk Merge] Error:', error);
+    res.status(500).json({ error: error.message || '合并文件块时发生错误' });
+  }
+});
 
 app.post('/api/upload', upload.single('video'), async (req, res) => {
   try {

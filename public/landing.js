@@ -219,9 +219,11 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Validate file size (100MB)
-        if (file.size > 100 * 1024 * 1024) {
-            alert('文件大小必须小于 100MB');
+        // Validate file size (20MB - limited by nginx on AI Builder platform)
+        const maxSize = 20 * 1024 * 1024; // 20MB
+        if (file.size > maxSize) {
+            const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+            alert(`文件大小必须小于 20MB。\n当前文件大小: ${sizeMB}MB\n\n提示: 请压缩视频或使用更短的视频片段。`);
             return;
         }
 

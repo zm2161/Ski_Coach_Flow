@@ -56,8 +56,11 @@ app.use(cors({
 }));
 
 
-app.use(express.json({ limit: '100mb' }));
-app.use(express.urlencoded({ extended: true, limit: '100mb' }));
+// Note: nginx (used by AI Builder/Koyeb) has default client_max_body_size of 1MB
+// We set to 20MB to allow reasonable video uploads while staying within nginx limits
+// For larger files, consider implementing chunked upload
+app.use(express.json({ limit: '20mb' }));
+app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 app.use(express.static('public'));
 app.use('/uploads', express.static('uploads'));
 
@@ -81,7 +84,9 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage: storage,
   limits: {
-    fileSize: 100 * 1024 * 1024 // 100MB limit
+    fileSize: 20 * 1024 * 1024 // 20MB limit (nginx default is 1MB, but we'll try 20MB)
+    // Note: If you still get 413 errors, the nginx limit may be lower
+    // Consider implementing chunked upload for larger files
   },
   fileFilter: (req, file, cb) => {
     const allowedExtensions = /\.(mp4|mov|avi|webm)$/i;
@@ -811,7 +816,23 @@ app.post('/api/upload', upload.single('video'), async (req, res) => {
     
     // Handle multer errors specifically
     if (error instanceof multer.MulterError) {
+      if (error.code === 'LIMIT_FILE_SIZE') {
+        return res.status(413).json({ 
+          error: '文件太大',
+          details: '文件大小超过 20MB 限制。请压缩视频或使用更短的视频片段。',
+          maxSize: '20MB'
+        });
+      }
       return res.status(400).json({ error: error.message || '文件上传失败' });
+    }
+    
+    // Handle 413 errors from nginx
+    if (error.message && error.message.includes('413')) {
+      return res.status(413).json({ 
+        error: '文件太大',
+        details: 'nginx 反向代理限制了文件大小。请使用小于 20MB 的视频文件，或考虑实现分块上传。',
+        maxSize: '20MB (nginx limit)'
+      });
     }
     
     // If it's an AI Builder API error, provide helpful message
